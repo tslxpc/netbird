@@ -203,6 +203,10 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 		}
 		// Absolutely required, otherwsise the dex server will omit the MFA configuration entirely
 		os.Setenv("DEX_SESSIONS_ENABLED", "true")
+
+		for i := range cfg.StaticClients {
+			cfg.StaticClients[i].MFAChain = []string{"default-totp"}
+		}
 	}
 
 	// Add owner user if provided

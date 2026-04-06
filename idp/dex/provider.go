@@ -286,6 +286,7 @@ func ensureStaticClients(ctx context.Context, stor storage.Storage, clients []st
 			old.Name = client.Name
 			old.Public = client.Public
 			old.PostLogoutRedirectURIs = client.PostLogoutRedirectURIs
+			old.MFAChain = client.MFAChain
 			return old, nil
 		}); err != nil {
 			return fmt.Errorf("failed to update client %s: %w", client.ID, err)
