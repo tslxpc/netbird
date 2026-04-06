@@ -158,6 +158,7 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 				Public:       true,
 				RedirectURIs: dashboardRedirectURIs,
 				PostLogoutRedirectURIs: []string{
+					c.Issuer,
 					logoutURL,
 				},
 			},
@@ -167,6 +168,7 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 				Public:       true,
 				RedirectURIs: cliRedirectURIs,
 				PostLogoutRedirectURIs: []string{
+					c.Issuer,
 					logoutURL,
 				},
 			},
