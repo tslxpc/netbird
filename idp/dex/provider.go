@@ -18,6 +18,7 @@ import (
 
 	dexapi "github.com/dexidp/dex/api/v2"
 	"github.com/dexidp/dex/server"
+	"github.com/dexidp/dex/server/signer"
 	"github.com/dexidp/dex/storage"
 	"github.com/dexidp/dex/storage/sql"
 	jose "github.com/go-jose/go-jose/v4"
@@ -70,7 +71,7 @@ func NewProvider(ctx context.Context, config *Config) (*Provider, error) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	// Ensure data directory exists
-	if err := os.MkdirAll(config.DataDir, 0700); err != nil {
+	if err := os.MkdirAll(config.DataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
@@ -101,6 +102,15 @@ func NewProvider(ctx context.Context, config *Config) (*Provider, error) {
 		return nil, fmt.Errorf("failed to create refresh token policy: %w", err)
 	}
 
+	localSignerConfig := signer.LocalConfig{
+		KeysRotationPeriod: "6h",
+	}
+
+	localSigner, err := localSignerConfig.Open(ctx, stor, 24*time.Hour, time.Now, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create local signer: %w", err)
+	}
+
 	// Build Dex server config - use Dex's types directly
 	dexConfig := server.Config{
 		Issuer:                     issuer,
@@ -110,12 +120,12 @@ func NewProvider(ctx context.Context, config *Config) (*Provider, error) {
 		ContinueOnConnectorFailure: true,
 		Logger:                     logger,
 		PrometheusRegistry:         prometheus.NewRegistry(),
-		RotateKeysAfter:            6 * time.Hour,
 		IDTokensValidFor:           24 * time.Hour,
 		RefreshTokenPolicy:         refreshPolicy,
 		Web: server.WebConfig{
 			Issuer: "NetBird",
 		},
+		Signer: localSigner,
 	}
 
 	dexSrv, err := server.NewServer(ctx, dexConfig)
@@ -167,6 +177,14 @@ func NewProviderFromYAML(ctx context.Context, yamlConfig *YAMLConfig) (*Provider
 		return nil, fmt.Errorf("failed to create refresh token policy: %w", err)
 	}
 
+	localSigner, err := getSigner(ctx, stor, yamlConfig, logger)
+	if err != nil {
+		stor.Close()
+		return nil, fmt.Errorf("failed to create local signer: %w", err)
+	}
+
+	dexConfig.Signer = localSigner
+
 	dexSrv, err := server.NewServer(ctx, dexConfig)
 	if err != nil {
 		stor.Close()
@@ -180,6 +198,32 @@ func NewProviderFromYAML(ctx context.Context, yamlConfig *YAMLConfig) (*Provider
 		storage:    stor,
 		logger:     logger,
 	}, nil
+}
+
+func getSigner(ctx context.Context, stor storage.Storage, yamlConfig *YAMLConfig, logger *slog.Logger) (signer.Signer, error) {
+	// Parse expiry durations
+	idTokensValidFor := 24 * time.Hour // default
+	if yamlConfig.Expiry.IDTokens != "" {
+		var err error
+		idTokensValidFor, err = parseDuration(yamlConfig.Expiry.IDTokens)
+		if err != nil {
+			return nil, fmt.Errorf("invalid config value %q for id token expiry: %v", yamlConfig.Expiry.IDTokens, err)
+		}
+	}
+
+	localSignerConfig := &signer.LocalConfig{
+		KeysRotationPeriod: "720h", // 30 Days
+	}
+
+	if yamlConfig.Expiry.SigningKeys != "" {
+		if _, err := parseDuration(yamlConfig.Expiry.SigningKeys); err != nil {
+			return nil, fmt.Errorf("invalid config value %q for signing key expiry: %v", yamlConfig.Expiry.SigningKeys, err)
+		}
+
+		localSignerConfig.KeysRotationPeriod = yamlConfig.Expiry.SigningKeys
+	}
+
+	return localSignerConfig.Open(ctx, stor, idTokensValidFor, time.Now, logger)
 }
 
 // initializeStorage sets up connectors, passwords, and clients in storage
@@ -241,6 +285,7 @@ func ensureStaticClients(ctx context.Context, stor storage.Storage, clients []st
 			old.RedirectURIs = client.RedirectURIs
 			old.Name = client.Name
 			old.Public = client.Public
+			old.PostLogoutRedirectURIs = client.PostLogoutRedirectURIs
 			return old, nil
 		}); err != nil {
 			return fmt.Errorf("failed to update client %s: %w", client.ID, err)
@@ -253,9 +298,6 @@ func ensureStaticClients(ctx context.Context, stor storage.Storage, clients []st
 func buildDexConfig(yamlConfig *YAMLConfig, stor storage.Storage, logger *slog.Logger) server.Config {
 	cfg := yamlConfig.ToServerConfig(stor, logger)
 	cfg.PrometheusRegistry = prometheus.NewRegistry()
-	if cfg.RotateKeysAfter == 0 {
-		cfg.RotateKeysAfter = 24 * 30 * time.Hour
-	}
 	if cfg.IDTokensValidFor == 0 {
 		cfg.IDTokensValidFor = 24 * time.Hour
 	}

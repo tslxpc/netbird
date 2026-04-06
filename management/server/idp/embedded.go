@@ -2,9 +2,11 @@ package idp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/dexidp/dex/storage"
@@ -49,6 +51,8 @@ type EmbeddedIdPConfig struct {
 	// Existing local users are preserved and will be able to login again if re-enabled.
 	// Cannot be enabled if no external identity provider connectors are configured.
 	LocalAuthDisabled bool
+	// EnableMFA will enforce TOTP multi factor authentication for local users
+	EnableMFA bool
 	// StaticConnectors are additional connectors to seed during initialization
 	StaticConnectors []dex.Connector
 }
@@ -123,6 +127,7 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 	// Build dashboard redirect URIs including the OAuth callback for proxy authentication
 	dashboardRedirectURIs := c.DashboardRedirectURIs
 	baseURL := strings.TrimSuffix(c.Issuer, "/oauth2")
+	logoutURL := strings.TrimRight(baseURL, "/") + "/"
 	// todo: resolve import cycle
 	dashboardRedirectURIs = append(dashboardRedirectURIs, baseURL+"/api/reverse-proxy/callback")
 
@@ -152,15 +157,52 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 				Name:         "NetBird Dashboard",
 				Public:       true,
 				RedirectURIs: dashboardRedirectURIs,
+				PostLogoutRedirectURIs: []string{
+					logoutURL,
+				},
 			},
 			{
 				ID:           staticClientCLI,
 				Name:         "NetBird CLI",
 				Public:       true,
 				RedirectURIs: cliRedirectURIs,
+				PostLogoutRedirectURIs: []string{
+					logoutURL,
+				},
 			},
 		},
 		StaticConnectors: c.StaticConnectors,
+	}
+
+	if c.EnableMFA {
+		totpConfig := dex.TOTPConfig{
+			Issuer: "Netbird",
+		}
+
+		rawTotpConfig, err := json.Marshal(totpConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal TOTP config: %v", err)
+		}
+
+		cfg.MFA.Authenticators = []dex.MFAAuthenticator{{
+			ID: "default-totp",
+			// Has to be caps otherwise it will fail
+			Type:           "TOTP",
+			Config:         rawTotpConfig,
+			ConnectorTypes: []string{},
+		}}
+
+		rememberMeEnabled := false
+
+		cfg.Sessions = &dex.Sessions{
+			CookieName:                 "netbird-session",
+			AbsoluteLifetime:           "24h",
+			ValidIfNotUsedFor:          "1h",
+			RememberMeCheckedByDefault: &rememberMeEnabled,
+			SSOSharedWithDefault:       "",
+		}
+		// Absolutely required, otherwsise the dex server will omit the MFA configuration entirely
+		os.Setenv("DEX_SESSIONS_ENABLED", "true")
 	}
 
 	// Add owner user if provided
