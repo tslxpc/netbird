@@ -1,13 +1,8 @@
 {{ template "header.html" . }}
 
 <div class="nb-card">
-    {{ if .LoggedOut }}
     <h1 class="nb-heading">Logged Out</h1>
     <p class="nb-subheading">You have been successfully logged out.</p>
-    {{ else }}
-    <h1 class="nb-heading">Session Not Found</h1>
-    <p class="nb-subheading">No active session found.</p>
-    {{ end }}
 
     {{ if .BackURL }}
     <div class="nb-back-link">
