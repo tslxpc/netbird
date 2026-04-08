@@ -54,10 +54,10 @@ type YAMLConfig struct {
 
 	// Sessions holds authentication session configuration.
 	// Requires DEX_SESSIONS_ENABLED=true feature flag.
-	Sessions *Sessions `json:"sessions"`
+	Sessions *Sessions `yaml:"sessions" json:"sessions"`
 
 	// MFA holds multi-factor authentication configuration.
-	MFA MFAConfig `json:"mfa"`
+	MFA MFAConfig `yaml:"mfa" json:"mfa"`
 }
 
 type Sessions struct {
@@ -561,6 +561,11 @@ func buildMFAProviders(authenticators []MFAAuthenticator, issuerURL string, logg
 func buildSessionsConfig(sessions *Sessions) *server.SessionConfig {
 	if sessions == nil {
 		return nil
+	}
+
+	if sessions.RememberMeCheckedByDefault == nil {
+		defaultRememberMeCheckedByDefault := false
+		sessions.RememberMeCheckedByDefault = &defaultRememberMeCheckedByDefault
 	}
 
 	absoluteLifetime, _ := parseDuration(sessions.AbsoluteLifetime)

@@ -228,7 +228,7 @@ func configureMFA(cfg *dex.YAMLConfig) error {
 		RememberMeCheckedByDefault: &rememberMeEnabled,
 		SSOSharedWithDefault:       "",
 	}
-	// Absolutely required, otherwsise the dex server will omit the MFA configuration entirely
+	// Absolutely required, otherwise the dex server will omit the MFA configuration entirely
 	os.Setenv("DEX_SESSIONS_ENABLED", "true")
 
 	for i := range cfg.StaticClients {
