@@ -504,6 +504,29 @@ func (c *YAMLConfig) Validate() error {
 	return nil
 }
 
+func buildTotpConfig(auth MFAAuthenticator) (*server.TOTPProvider, error) {
+	var cfg TOTPConfig
+	if err := json.Unmarshal(auth.Config, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse TOTP config id: %s - %w", auth.ID, err)
+	}
+
+	return server.NewTOTPProvider(cfg.Issuer, auth.ConnectorTypes), nil
+}
+
+func buildWebAuthnConfig(auth MFAAuthenticator, issuerURL string) (*server.WebAuthnProvider, error) {
+	var cfg WebAuthnConfig
+	if err := json.Unmarshal(auth.Config, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse WebAuthn config id: %s - %w", auth.ID, err)
+	}
+	provider, err := server.NewWebAuthnProvider(cfg.RPDisplayName, cfg.RPID, cfg.RPOrigins,
+		cfg.AttestationPreference, cfg.Timeout, issuerURL, auth.ConnectorTypes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create WebAuthn provider id: %s - err: %w", auth.ID, err)
+	}
+
+	return provider, nil
+}
+
 func buildMFAProviders(authenticators []MFAAuthenticator, issuerURL string, logger *slog.Logger) map[string]server.MFAProvider {
 	if len(authenticators) == 0 {
 		return nil
@@ -513,23 +536,17 @@ func buildMFAProviders(authenticators []MFAAuthenticator, issuerURL string, logg
 	for _, auth := range authenticators {
 		switch auth.Type {
 		case "TOTP":
-			var cfg TOTPConfig
-			if err := json.Unmarshal(auth.Config, &cfg); err != nil {
+			provider, err := buildTotpConfig(auth)
+			if err != nil {
 				logger.Error("failed to parse TOTP config", "id", auth.ID, "err", err)
 				continue
 			}
-			providers[auth.ID] = server.NewTOTPProvider(cfg.Issuer, auth.ConnectorTypes)
+			providers[auth.ID] = provider
 			logger.Info("MFA authenticator configured", "id", auth.ID, "type", auth.Type)
 		case "WebAuthn":
-			var cfg WebAuthnConfig
-			if err := json.Unmarshal(auth.Config, &cfg); err != nil {
-				logger.Error("failed to parse WebAuthn config", "id", auth.ID, "err", err)
-				continue
-			}
-			provider, err := server.NewWebAuthnProvider(cfg.RPDisplayName, cfg.RPID, cfg.RPOrigins,
-				cfg.AttestationPreference, cfg.Timeout, issuerURL, auth.ConnectorTypes)
+			provider, err := buildWebAuthnConfig(auth, issuerURL)
 			if err != nil {
-				logger.Error("failed to create WebAuthn provider", "id", auth.ID, "err", err)
+				logger.Error("failed to parse WebAuthn config", "id", auth.ID, "err", err)
 				continue
 			}
 			providers[auth.ID] = provider

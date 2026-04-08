@@ -177,37 +177,8 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 	}
 
 	if c.EnableMFA {
-		totpConfig := dex.TOTPConfig{
-			Issuer: "Netbird",
-		}
-
-		rawTotpConfig, err := json.Marshal(totpConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal TOTP config: %v", err)
-		}
-
-		cfg.MFA.Authenticators = []dex.MFAAuthenticator{{
-			ID: "default-totp",
-			// Has to be caps otherwise it will fail
-			Type:           "TOTP",
-			Config:         rawTotpConfig,
-			ConnectorTypes: []string{},
-		}}
-
-		rememberMeEnabled := false
-
-		cfg.Sessions = &dex.Sessions{
-			CookieName:                 "netbird-session",
-			AbsoluteLifetime:           "24h",
-			ValidIfNotUsedFor:          "1h",
-			RememberMeCheckedByDefault: &rememberMeEnabled,
-			SSOSharedWithDefault:       "",
-		}
-		// Absolutely required, otherwsise the dex server will omit the MFA configuration entirely
-		os.Setenv("DEX_SESSIONS_ENABLED", "true")
-
-		for i := range cfg.StaticClients {
-			cfg.StaticClients[i].MFAChain = []string{"default-totp"}
+		if err := configureMFA(cfg); err != nil {
+			return nil, err
 		}
 	}
 
@@ -228,6 +199,42 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+func configureMFA(cfg *dex.YAMLConfig) error {
+	totpConfig := dex.TOTPConfig{
+		Issuer: "Netbird",
+	}
+
+	rawTotpConfig, err := json.Marshal(totpConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal TOTP config: %v", err)
+	}
+
+	cfg.MFA.Authenticators = []dex.MFAAuthenticator{{
+		ID: "default-totp",
+		// Has to be caps otherwise it will fail
+		Type:           "TOTP",
+		Config:         rawTotpConfig,
+		ConnectorTypes: []string{},
+	}}
+
+	rememberMeEnabled := false
+
+	cfg.Sessions = &dex.Sessions{
+		CookieName:                 "netbird-session",
+		AbsoluteLifetime:           "24h",
+		ValidIfNotUsedFor:          "1h",
+		RememberMeCheckedByDefault: &rememberMeEnabled,
+		SSOSharedWithDefault:       "",
+	}
+	// Absolutely required, otherwsise the dex server will omit the MFA configuration entirely
+	os.Setenv("DEX_SESSIONS_ENABLED", "true")
+
+	for i := range cfg.StaticClients {
+		cfg.StaticClients[i].MFAChain = []string{"default-totp"}
+	}
+	return nil
 }
 
 // Compile-time check that EmbeddedIdPManager implements Manager interface
