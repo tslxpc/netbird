@@ -53,6 +53,12 @@ type EmbeddedIdPConfig struct {
 	LocalAuthDisabled bool
 	// EnableMFA will enforce TOTP multi factor authentication for local users
 	EnableMFA bool
+	// Dashboard Post logout redirect URIs, these are required to tell
+	// Dex what to allow when an RP-Initiated logout is started by the frontend
+	// at least one of these must match the dashboard base URL or the dashboard
+	// DASHBOARD_POST_LOGOUT_URL environment variable
+	// WARNING: Dex only uses exact match, not wildcards
+	DashboardPostLogoutRedirectURIs []string
 	// StaticConnectors are additional connectors to seed during initialization
 	StaticConnectors []dex.Connector
 }
@@ -127,9 +133,13 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 	// Build dashboard redirect URIs including the OAuth callback for proxy authentication
 	dashboardRedirectURIs := c.DashboardRedirectURIs
 	baseURL := strings.TrimSuffix(c.Issuer, "/oauth2")
-	logoutURL := strings.TrimRight(baseURL, "/") + "/"
 	// todo: resolve import cycle
 	dashboardRedirectURIs = append(dashboardRedirectURIs, baseURL+"/api/reverse-proxy/callback")
+
+	dashboardPostLogoutRedirectURIs := c.DashboardPostLogoutRedirectURIs
+	// It is safe to assume that most installations will share the location of the
+	// MGMT api and the dashboard, adding baseURL means less configuration for the instance admin
+	dashboardPostLogoutRedirectURIs = append(dashboardPostLogoutRedirectURIs, baseURL)
 
 	cfg := &dex.YAMLConfig{
 		Issuer: c.Issuer,
@@ -153,24 +163,17 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 		EnablePasswordDB: true,
 		StaticClients: []storage.Client{
 			{
-				ID:           staticClientDashboard,
-				Name:         "NetBird Dashboard",
-				Public:       true,
-				RedirectURIs: dashboardRedirectURIs,
-				PostLogoutRedirectURIs: []string{
-					c.Issuer,
-					logoutURL,
-				},
+				ID:                     staticClientDashboard,
+				Name:                   "NetBird Dashboard",
+				Public:                 true,
+				RedirectURIs:           dashboardRedirectURIs,
+				PostLogoutRedirectURIs: sanitizePostLogoutRedirectURIs(dashboardPostLogoutRedirectURIs),
 			},
 			{
 				ID:           staticClientCLI,
 				Name:         "NetBird CLI",
 				Public:       true,
 				RedirectURIs: cliRedirectURIs,
-				PostLogoutRedirectURIs: []string{
-					c.Issuer,
-					logoutURL,
-				},
 			},
 		},
 		StaticConnectors: c.StaticConnectors,
@@ -199,6 +202,24 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+// Due to how the frontend generates the logout, sometimes it appends a trailing slash
+// and because Dex only allows exact matches, we need to make sure we always have both
+// versions of each provided uri
+func sanitizePostLogoutRedirectURIs(uris []string) []string {
+	result := make([]string, 0)
+	for _, uri := range uris {
+		if strings.HasSuffix(uri, "/") {
+			result = append(result, uri)
+			result = append(result, strings.TrimSuffix(uri, "/"))
+		} else {
+			result = append(result, uri)
+			result = append(result, uri+"/")
+		}
+	}
+
+	return result
 }
 
 func configureMFA(cfg *dex.YAMLConfig) error {
