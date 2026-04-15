@@ -203,7 +203,7 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 
 func configureMFA(cfg *dex.YAMLConfig) error {
 	totpConfig := dex.TOTPConfig{
-		Issuer: "Netbird",
+		Issuer: "NetBird",
 	}
 
 	rawTotpConfig, err := json.Marshal(totpConfig)

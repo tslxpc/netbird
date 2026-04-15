@@ -112,16 +112,6 @@ type WebAuthnConfig struct {
 	//   "indirect" — authenticator may anonymize attestation (default)
 	//   "direct"   — request full attestation (for enterprise key model verification)
 	AttestationPreference string `yaml:"attestationPreference" json:"attestationPreference"`
-	// UserVerification controls whether PIN or biometric verification is required:
-	//   "required"    — always require (PIN, fingerprint, etc.)
-	//   "preferred"   — request if the authenticator supports it (default)
-	//   "discouraged" — skip verification, presence check only
-	UserVerification string `yaml:"userVerification" json:"userVerification"`
-	// AuthenticatorAttachment restricts which authenticator types are allowed:
-	//   "platform"      — built-in only (Touch ID, Windows Hello)
-	//   "cross-platform" — external only (YubiKey, USB security keys)
-	//   ""              — any authenticator (default)
-	AuthenticatorAttachment string `yaml:"authenticatorAttachment" json:"authenticatorAttachment"`
 	// Timeout is the duration allowed for the browser WebAuthn ceremony
 	// (registration or login). Defaults to "60s".
 	Timeout string `yaml:"timeout" json:"timeout"`
@@ -518,6 +508,7 @@ func buildWebAuthnConfig(auth MFAAuthenticator, issuerURL string) (*server.WebAu
 	if err := json.Unmarshal(auth.Config, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse WebAuthn config id: %s - %w", auth.ID, err)
 	}
+
 	provider, err := server.NewWebAuthnProvider(cfg.RPDisplayName, cfg.RPID, cfg.RPOrigins,
 		cfg.AttestationPreference, cfg.Timeout, issuerURL, auth.ConnectorTypes)
 	if err != nil {
