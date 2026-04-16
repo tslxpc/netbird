@@ -2,7 +2,6 @@ package idp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -227,20 +226,13 @@ func sanitizePostLogoutRedirectURIs(uris []string) []string {
 }
 
 func configureMFA(cfg *dex.YAMLConfig, sessionMaxLifetime, sessionIdleTimeout string) error {
-	totpConfig := dex.TOTPConfig{
-		Issuer: "NetBird",
-	}
-
-	rawTotpConfig, err := json.Marshal(totpConfig)
-	if err != nil {
-		return fmt.Errorf("failed to marshal TOTP config: %v", err)
-	}
-
 	cfg.MFA.Authenticators = []dex.MFAAuthenticator{{
 		ID: "default-totp",
 		// Has to be caps otherwise it will fail
-		Type:           "TOTP",
-		Config:         rawTotpConfig,
+		Type: "TOTP",
+		Config: map[string]interface{}{
+			"issuer": "NetBird",
+		},
 		ConnectorTypes: []string{"local"},
 	}}
 

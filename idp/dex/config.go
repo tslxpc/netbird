@@ -83,9 +83,9 @@ type MFAConfig struct {
 }
 
 type MFAAuthenticator struct {
-	ID     string          `yaml:"id" json:"id"`
-	Type   string          `yaml:"type" json:"type"`
-	Config json.RawMessage `yaml:"config" json:"config"`
+	ID     string                 `yaml:"id" json:"id"`
+	Type   string                 `yaml:"type" json:"type"`
+	Config map[string]interface{} `yaml:"config" json:"config"`
 
 	ConnectorTypes []string `yaml:"connectorTypes" json:"connectorTypes"`
 }
@@ -495,8 +495,13 @@ func (c *YAMLConfig) Validate() error {
 }
 
 func buildTotpConfig(auth MFAAuthenticator) (*server.TOTPProvider, error) {
+	data, err := json.Marshal(auth.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal TOTP config id: %s - %w", auth.ID, err)
+	}
+
 	var cfg TOTPConfig
-	if err := json.Unmarshal(auth.Config, &cfg); err != nil {
+	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse TOTP config id: %s - %w", auth.ID, err)
 	}
 
@@ -504,8 +509,13 @@ func buildTotpConfig(auth MFAAuthenticator) (*server.TOTPProvider, error) {
 }
 
 func buildWebAuthnConfig(auth MFAAuthenticator, issuerURL string) (*server.WebAuthnProvider, error) {
+	data, err := json.Marshal(auth.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal WebAuthn config id: %s - %w", auth.ID, err)
+	}
+
 	var cfg WebAuthnConfig
-	if err := json.Unmarshal(auth.Config, &cfg); err != nil {
+	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse WebAuthn config id: %s - %w", auth.ID, err)
 	}
 
