@@ -71,7 +71,7 @@ require (
 	github.com/mdlayher/socket v0.5.1
 	github.com/miekg/dns v1.1.59
 	github.com/mitchellh/hashstructure/v2 v2.0.2
-	github.com/netbirdio/management-integrations/integrations v0.0.0-20260210160626-df4b180c7b25
+	github.com/netbirdio/management-integrations/integrations v0.0.0-20260416123949-2355d972be42
 	github.com/netbirdio/signal-dispatcher/dispatcher v0.0.0-20250805121659-6b4ac470ca45
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/okta/okta-sdk-golang/v2 v2.18.0
@@ -121,7 +121,7 @@ require (
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.42.0
 	golang.org/x/time v0.15.0
-	google.golang.org/api v0.275.0
+	google.golang.org/api v0.276.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/driver/postgres v1.5.7
