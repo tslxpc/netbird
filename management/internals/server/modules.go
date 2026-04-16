@@ -135,7 +135,9 @@ func (s *BaseServer) IdpManager() idp.Manager {
 			}
 
 			if val := isMFAEnabledForAccount(s.Store().GetAllAccounts(context.Background())); val {
-				embeddedMgr.SetMFAEnabled(context.Background(), val)
+				if err := embeddedMgr.SetMFAEnabled(context.Background(), val); err != nil {
+					log.Errorf("failed to set MFA enabled on embedded IDP: %v", err)
+				}
 			}
 
 			return embeddedMgr
