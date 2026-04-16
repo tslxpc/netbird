@@ -493,6 +493,20 @@ func (p *Provider) Storage() storage.Storage {
 	return p.storage
 }
 
+// SetClientsMFAChain updates the MFAChain field on the dashboard and CLI OAuth2 clients.
+// Pass a non-empty slice (e.g. []string{"default-totp"}) to enable MFA, or nil to disable it.
+func (p *Provider) SetClientsMFAChain(ctx context.Context, clientIDs []string, mfaChain []string) error {
+	for _, clientID := range clientIDs {
+		if err := p.storage.UpdateClient(ctx, clientID, func(old storage.Client) (storage.Client, error) {
+			old.MFAChain = mfaChain
+			return old, nil
+		}); err != nil {
+			return fmt.Errorf("failed to update MFA chain on client %s: %w", clientID, err)
+		}
+	}
+	return nil
+}
+
 // Handler returns the Dex server as an http.Handler for embedding in another server.
 // The handler expects requests with path prefix "/oauth2/".
 func (p *Provider) Handler() http.Handler {

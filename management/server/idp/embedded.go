@@ -51,8 +51,12 @@ type EmbeddedIdPConfig struct {
 	// Existing local users are preserved and will be able to login again if re-enabled.
 	// Cannot be enabled if no external identity provider connectors are configured.
 	LocalAuthDisabled bool
-	// EnableMFA will enforce TOTP multi factor authentication for local users
-	EnableMFA bool
+	// MfaSessionMaxLifetime is the maximum MFA session duration from creation (e.g. "24h").
+	// Defaults to "24h" if empty.
+	MfaSessionMaxLifetime string
+	// MfaSessionIdleTimeout is the idle timeout after which the MFA session expires (e.g. "1h").
+	// Defaults to "1h" if empty.
+	MfaSessionIdleTimeout string
 	// Dashboard Post logout redirect URIs, these are required to tell
 	// Dex what to allow when an RP-Initiated logout is started by the frontend
 	// at least one of these must match the dashboard base URL or the dashboard
@@ -179,10 +183,10 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 		StaticConnectors: c.StaticConnectors,
 	}
 
-	if c.EnableMFA {
-		if err := configureMFA(cfg); err != nil {
-			return nil, err
-		}
+	// Always initialize MFA providers and sessions so TOTP can be toggled at runtime.
+	// MFAChain on clients is NOT set here — it's synced from the DB setting on startup.
+	if err := configureMFA(cfg, c.MfaSessionMaxLifetime, c.MfaSessionIdleTimeout); err != nil {
+		return nil, err
 	}
 
 	// Add owner user if provided
@@ -222,7 +226,7 @@ func sanitizePostLogoutRedirectURIs(uris []string) []string {
 	return result
 }
 
-func configureMFA(cfg *dex.YAMLConfig) error {
+func configureMFA(cfg *dex.YAMLConfig, sessionMaxLifetime, sessionIdleTimeout string) error {
 	totpConfig := dex.TOTPConfig{
 		Issuer: "NetBird",
 	}
@@ -240,21 +244,27 @@ func configureMFA(cfg *dex.YAMLConfig) error {
 		ConnectorTypes: []string{"local"},
 	}}
 
+	if sessionMaxLifetime == "" {
+		sessionMaxLifetime = "24h"
+	}
+	if sessionIdleTimeout == "" {
+		sessionIdleTimeout = "1h"
+	}
+
 	rememberMeEnabled := false
 
 	cfg.Sessions = &dex.Sessions{
 		CookieName:                 "netbird-session",
-		AbsoluteLifetime:           "24h",
-		ValidIfNotUsedFor:          "1h",
+		AbsoluteLifetime:           sessionMaxLifetime,
+		ValidIfNotUsedFor:          sessionIdleTimeout,
 		RememberMeCheckedByDefault: &rememberMeEnabled,
 		SSOSharedWithDefault:       "",
 	}
 	// Absolutely required, otherwise the dex server will omit the MFA configuration entirely
 	os.Setenv("DEX_SESSIONS_ENABLED", "true")
 
-	for i := range cfg.StaticClients {
-		cfg.StaticClients[i].MFAChain = []string{"default-totp"}
-	}
+	// Note: MFAChain on clients is NOT set here.
+	// It is toggled at runtime via SetMFAEnabled() based on the account settings DB value.
 	return nil
 }
 
@@ -291,6 +301,7 @@ type EmbeddedIdPManager struct {
 	provider   *dex.Provider
 	appMetrics telemetry.AppMetrics
 	config     EmbeddedIdPConfig
+	mfaEnabled bool
 }
 
 // NewEmbeddedIdPManager creates a new instance of EmbeddedIdPManager from a configuration.
@@ -715,6 +726,27 @@ func (m *EmbeddedIdPManager) GetUserIDClaim() string {
 // IsLocalAuthDisabled returns whether local authentication is disabled based on configuration.
 func (m *EmbeddedIdPManager) IsLocalAuthDisabled() bool {
 	return m.config.LocalAuthDisabled
+}
+
+// SetMFAEnabled enables or disables TOTP MFA for local users by updating the MFAChain on OAuth2 clients.
+func (m *EmbeddedIdPManager) SetMFAEnabled(ctx context.Context, enabled bool) error {
+	var mfaChain []string
+	if enabled {
+		mfaChain = []string{"default-totp"}
+	}
+	if err := m.provider.SetClientsMFAChain(ctx, []string{
+		staticClientCLI,
+		staticClientDashboard,
+	}, mfaChain); err != nil {
+		return fmt.Errorf("failed to set MFA enabled=%v: %w", enabled, err)
+	}
+	m.mfaEnabled = enabled
+	return nil
+}
+
+// IsMFAEnabled returns whether TOTP MFA is currently enabled for local users.
+func (m *EmbeddedIdPManager) IsMFAEnabled() bool {
+	return m.mfaEnabled
 }
 
 // HasNonLocalConnectors checks if there are any identity provider connectors other than local.

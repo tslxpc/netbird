@@ -135,8 +135,9 @@ type ManagementConfig struct {
 type AuthConfig struct {
 	Issuer                          string            `yaml:"issuer"`
 	LocalAuthDisabled               bool              `yaml:"localAuthDisabled"`
-	EnableLocalMFA                  bool              `yaml:"enableLocalMFA"`
 	SignKeyRefreshEnabled           bool              `yaml:"signKeyRefreshEnabled"`
+	MfaSessionMaxLifetime           string            `yaml:"mfaSessionMaxLifetime"`
+	MfaSessionIdleTimeout           string            `yaml:"mfaSessionIdleTimeout"`
 	Storage                         AuthStorageConfig `yaml:"storage"`
 	DashboardRedirectURIs           []string          `yaml:"dashboardRedirectURIs"`
 	CLIRedirectURIs                 []string          `yaml:"cliRedirectURIs"`
@@ -584,10 +585,11 @@ func (c *CombinedConfig) buildEmbeddedIdPConfig(mgmt ManagementConfig) (*idp.Emb
 
 	cfg := &idp.EmbeddedIdPConfig{
 		Enabled:               true,
-		EnableMFA:             mgmt.Auth.EnableLocalMFA,
 		Issuer:                mgmt.Auth.Issuer,
 		LocalAuthDisabled:     mgmt.Auth.LocalAuthDisabled,
 		SignKeyRefreshEnabled: mgmt.Auth.SignKeyRefreshEnabled,
+		MfaSessionMaxLifetime: mgmt.Auth.MfaSessionMaxLifetime,
+		MfaSessionIdleTimeout: mgmt.Auth.MfaSessionIdleTimeout,
 		Storage: idp.EmbeddedStorageConfig{
 			Type: authStorageType,
 			Config: idp.EmbeddedStorageTypeConfig{

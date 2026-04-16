@@ -377,6 +377,10 @@ components:
           type: boolean
           readOnly: true
           example: false
+        local_mfa_enabled:
+          description: Enables or disables TOTP multi-factor authentication for local users. Only applicable when the embedded identity provider is enabled.
+          type: boolean
+          example: false
       required:
         - peer_login_expiration_enabled
         - peer_login_expiration

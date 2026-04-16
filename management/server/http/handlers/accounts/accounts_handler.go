@@ -228,6 +228,9 @@ func (h *handler) updateAccountRequestSettings(req api.PutApiAccountsAccountIdJS
 	if req.Settings.AutoUpdateAlways != nil {
 		returnSettings.AutoUpdateAlways = *req.Settings.AutoUpdateAlways
 	}
+	if req.Settings.LocalMfaEnabled != nil {
+		returnSettings.LocalMfaEnabled = *req.Settings.LocalMfaEnabled
+	}
 
 	return returnSettings, nil
 }
@@ -354,6 +357,7 @@ func toAccountResponse(accountID string, settings *types.Settings, meta *types.A
 		AutoUpdateAlways:                &settings.AutoUpdateAlways,
 		EmbeddedIdpEnabled:              &settings.EmbeddedIdpEnabled,
 		LocalAuthDisabled:               &settings.LocalAuthDisabled,
+		LocalMfaEnabled:                 &settings.LocalMfaEnabled,
 	}
 
 	if settings.NetworkRange.IsValid() {
