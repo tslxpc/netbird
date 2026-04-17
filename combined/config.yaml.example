@@ -89,6 +89,7 @@ server:
     # MFA session settings (applies when TOTP is enabled for an account)
     # mfaSessionMaxLifetime: "24h"  # Max duration for an MFA session from creation
     # mfaSessionIdleTimeout: "1h"   # MFA session expires after this idle period
+    # mfaSessionRememberMe: false   # Pre-check "remember me" on login so the MFA session persists across tabs/restarts
     # OAuth2 redirect URIs for dashboard
     dashboardRedirectURIs:
       - "https://app.example.com/nb-auth"

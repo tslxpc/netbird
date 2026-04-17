@@ -56,6 +56,10 @@ type EmbeddedIdPConfig struct {
 	// MfaSessionIdleTimeout is the idle timeout after which the MFA session expires (e.g. "1h").
 	// Defaults to "1h" if empty.
 	MfaSessionIdleTimeout string
+	// MfaSessionRememberMe controls the default state of the "remember me" checkbox on the
+	// login screen. When true, the session cookie persists across browser tabs/restarts so
+	// MFA is not re-prompted until the session expires. Defaults to false.
+	MfaSessionRememberMe bool
 	// Dashboard Post logout redirect URIs, these are required to tell
 	// Dex what to allow when an RP-Initiated logout is started by the frontend
 	// at least one of these must match the dashboard base URL or the dashboard
@@ -184,7 +188,7 @@ func (c *EmbeddedIdPConfig) ToYAMLConfig() (*dex.YAMLConfig, error) {
 
 	// Always initialize MFA providers and sessions so TOTP can be toggled at runtime.
 	// MFAChain on clients is NOT set here — it's synced from the DB setting on startup.
-	if err := configureMFA(cfg, c.MfaSessionMaxLifetime, c.MfaSessionIdleTimeout); err != nil {
+	if err := configureMFA(cfg, c.MfaSessionMaxLifetime, c.MfaSessionIdleTimeout, c.MfaSessionRememberMe); err != nil {
 		return nil, err
 	}
 
@@ -225,7 +229,7 @@ func sanitizePostLogoutRedirectURIs(uris []string) []string {
 	return result
 }
 
-func configureMFA(cfg *dex.YAMLConfig, sessionMaxLifetime, sessionIdleTimeout string) error {
+func configureMFA(cfg *dex.YAMLConfig, sessionMaxLifetime, sessionIdleTimeout string, rememberMe bool) error {
 	cfg.MFA.Authenticators = []dex.MFAAuthenticator{{
 		ID: "default-totp",
 		// Has to be caps otherwise it will fail
@@ -243,13 +247,11 @@ func configureMFA(cfg *dex.YAMLConfig, sessionMaxLifetime, sessionIdleTimeout st
 		sessionIdleTimeout = "1h"
 	}
 
-	rememberMeEnabled := false
-
 	cfg.Sessions = &dex.Sessions{
 		CookieName:                 "netbird-session",
 		AbsoluteLifetime:           sessionMaxLifetime,
 		ValidIfNotUsedFor:          sessionIdleTimeout,
-		RememberMeCheckedByDefault: &rememberMeEnabled,
+		RememberMeCheckedByDefault: &rememberMe,
 		SSOSharedWithDefault:       "",
 	}
 	// Absolutely required, otherwise the dex server will omit the MFA configuration entirely

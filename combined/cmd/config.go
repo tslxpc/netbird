@@ -138,6 +138,7 @@ type AuthConfig struct {
 	SignKeyRefreshEnabled           bool              `yaml:"signKeyRefreshEnabled"`
 	MfaSessionMaxLifetime           string            `yaml:"mfaSessionMaxLifetime"`
 	MfaSessionIdleTimeout           string            `yaml:"mfaSessionIdleTimeout"`
+	MfaSessionRememberMe            bool              `yaml:"mfaSessionRememberMe"`
 	Storage                         AuthStorageConfig `yaml:"storage"`
 	DashboardRedirectURIs           []string          `yaml:"dashboardRedirectURIs"`
 	CLIRedirectURIs                 []string          `yaml:"cliRedirectURIs"`
@@ -590,6 +591,7 @@ func (c *CombinedConfig) buildEmbeddedIdPConfig(mgmt ManagementConfig) (*idp.Emb
 		SignKeyRefreshEnabled: mgmt.Auth.SignKeyRefreshEnabled,
 		MfaSessionMaxLifetime: mgmt.Auth.MfaSessionMaxLifetime,
 		MfaSessionIdleTimeout: mgmt.Auth.MfaSessionIdleTimeout,
+		MfaSessionRememberMe:  mgmt.Auth.MfaSessionRememberMe,
 		Storage: idp.EmbeddedStorageConfig{
 			Type: authStorageType,
 			Config: idp.EmbeddedStorageTypeConfig{
