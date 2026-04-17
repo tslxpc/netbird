@@ -252,7 +252,8 @@ func configureMFA(cfg *dex.YAMLConfig, sessionMaxLifetime, sessionIdleTimeout st
 		AbsoluteLifetime:           sessionMaxLifetime,
 		ValidIfNotUsedFor:          sessionIdleTimeout,
 		RememberMeCheckedByDefault: &rememberMe,
-		SSOSharedWithDefault:       "",
+		SSOSharedWithDefault:       "all",
+		CookieEncryptionKey:        "32",
 	}
 	// Absolutely required, otherwise the dex server will omit the MFA configuration entirely
 	os.Setenv("DEX_SESSIONS_ENABLED", "true")
